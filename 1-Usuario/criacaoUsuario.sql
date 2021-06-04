@@ -1,0 +1,12 @@
+-- Criação do ambiente do projeto
+--ALTER SESSION SET "_ORACLE_SCRIPT"= TRUE;
+CREATE USER projeto IDENTIFIED BY projeto
+DEFAULT TABLESPACE USERS TEMPORARY TABLESPACE TEMP;
+
+GRANT connect, resource TO projeto;
+GRANT create public synonym TO projeto;
+GRANT create view TO projeto;
+GRANT EXECUTE ANY PROCEDURE TO projeto;
+GRANT CREATE ANY DIRECTORY TO projeto;
+
+ALTER USER PROJETO QUOTA UNLIMITED ON USERS;

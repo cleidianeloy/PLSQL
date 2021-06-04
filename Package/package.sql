@@ -1,0 +1,114 @@
+create or replace PACKAGE PROJETO IS 
+PROCEDURE atualiza_reserva
+(IDENTIFICACAO ESTOQUE.ID_PRODUTO%TYPE);
+
+PROCEDURE INCLUIR_CLIENTE(
+p_NOME_CLIENTE CLIENTES.NOME_CLIENTE%TYPE);
+
+PROCEDURE incluir_item
+(
+p_ID_PEDIDO ITEM_PEDIDOS.ID_PEDIDO%TYPE,
+p_ID_ITEM_PEDIDO ITEM_PEDIDOS.ID_ITEM_PEDIDO%TYPE, 
+p_PRODUTO VARCHAR2, 
+p_QUANTIDADE ITEM_PEDIDOS.QUANTIDADE%TYPE);
+
+PROCEDURE ALTERA_SEQUENCIA 
+( SEQUENCIA VARCHAR2,  NUMERO NUMBER);
+
+PROCEDURE REGISTRA_ITEM
+( p_ID_PEDIDO PEDIDOS.ID_PEDIDO%TYPE,  p_ID_PRODUTO IDs_produtos_array, p_quantidade_por_produto Quantidade_produtos_array, p_quantidade_itens  NUMBER);
+
+PROCEDURE REGISTRA_PEDIDO(
+p_ID_CLIENTE CLIENTES.ID_CLIENTE%TYPE, 
+p_PRODUTOS IDs_produtos_array, 
+p_QUANTIDADE Quantidade_produtos_array);
+END PROJETO;
+
+create or replace  PACKAGE BODY PROJETO IS
+PROCEDURE atualiza_reserva
+(IDENTIFICACAO ESTOQUE.ID_PRODUTO%TYPE)
+IS 
+BEGIN 
+        UPDATE ESTOQUE 
+        SET RESERVA = (
+                                        SELECT SUM(QUANTIDADE) 
+                                        FROM ITEM_PEDIDOS
+                                        WHERE ID_PRODUTO = IDENTIFICACAO
+                                        GROUP BY ID_PRODUTO)
+
+
+            WHERE ID_PRODUTO = IDENTIFICACAO;
+END;
+
+PROCEDURE incluir_item
+(
+p_ID_PEDIDO ITEM_PEDIDOS.ID_PEDIDO%TYPE,
+p_ID_ITEM_PEDIDO ITEM_PEDIDOS.ID_ITEM_PEDIDO%TYPE, 
+p_PRODUTO VARCHAR2, 
+p_QUANTIDADE ITEM_PEDIDOS.QUANTIDADE%TYPE)
+IS
+BEGIN
+
+ INSERT INTO ITEM_PEDIDOS (ID_PEDIDO, ID_ITEM_PEDIDO,ID_PRODUTO, QUANTIDADE) 
+ VALUES (p_ID_PEDIDO, p_ID_ITEM_PEDIDO, (SELECT ID_PRODUTO FROM PRODUTOS WHERE NOME_PRODUTO = p_PRODUTO), p_QUANTIDADE);
+
+END;
+
+PROCEDURE INCLUIR_CLIENTE(
+p_NOME_CLIENTE CLIENTES.NOME_CLIENTE%TYPE)
+IS
+BEGIN
+            INSERT INTO CLIENTES VALUES (SEQUENCE_CLIENTES.NEXTVAL, p_NOME_CLIENTE, SYSDATE );
+END;
+
+PROCEDURE ALTERA_SEQUENCIA ( SEQUENCIA VARCHAR2,  NUMERO NUMBER)
+IS 
+ST VARCHAR(1000);
+N NUMBER;
+BEGIN 
+            ST := 'ALTER SEQUENCE ' || SEQUENCIA || ' INCREMENT BY -' || NUMERO;
+            execute immediate ST;
+            ST := 'SELECT ' || SEQUENCIA || '.NEXTVAL FROM DUAL ' ;
+            execute immediate ST INTO N;
+            ST := 'ALTER SEQUENCE ' || SEQUENCIA || ' INCREMENT BY 1';
+            execute immediate ST;
+END;
+
+PROCEDURE REGISTRA_ITEM
+( p_ID_PEDIDO PEDIDOS.ID_PEDIDO%TYPE,  p_ID_PRODUTO IDs_produtos_array, p_quantidade_por_produto Quantidade_produtos_array, p_quantidade_itens  NUMBER)
+IS
+BEGIN 
+            FOR i IN 1..p_quantidade_itens  LOOP
+            
+                    INSERT INTO ITEM_PEDIDOS VALUES ( p_ID_PEDIDO , SEQUENCE_ITEM_PEDIDOS.NEXTVAL , p_ID_PRODUTO(i), p_quantidade_por_produto(i));
+                    --UPDATE ESTOQUE SET RESERVA = RESERVA + p_quantidade_por_produto(i) WHERE ID_PRODUTO = p_ID_PRODUTO(i);
+
+            END LOOP;
+
+           PROJETO.ALTERA_SEQUENCIA('SEQUENCE_ITEM_PEDIDOS', p_quantidade_itens );
+
+END;
+
+PROCEDURE REGISTRA_PEDIDO(
+p_ID_CLIENTE CLIENTES.ID_CLIENTE%TYPE,  p_PRODUTOS IDs_produtos_array, p_QUANTIDADE Quantidade_produtos_array)
+IS  
+ST varchar(1000);
+n number;
+e_TAMANHO_DIFERENTE exception;
+BEGIN 
+        IF (p_PRODUTOS.count != p_QUANTIDADE.count) THEN
+            RAISE e_TAMANHO_DIFERENTE;
+        ELSE 
+                INSERT INTO PEDIDOS VALUES (SEQUENCE_PEDIDOS.NEXTVAL, p_ID_CLIENTE,  SYSDATE , 'Reservado');
+        
+                ST := 'SELECT MAX(ID_PEDIDO) FROM PEDIDOS';
+                execute immediate ST INTO N; --COLOCA O RESULTADO DA PESQUISA DENTRO DE UMA VARIAVEL
+                PROJETO.REGISTRA_ITEM(N, p_PRODUTOS, p_QUANTIDADE, p_PRODUTOS.count);
+        END IF;
+        EXCEPTION 
+                WHEN e_TAMANHO_DIFERENTE THEN 
+                        raise_application_error(-20100, 'A quantidade de produto e de valores informada não é igual a de quantidade referente ao produto ');
+        
+END;
+
+END PROJETO;
